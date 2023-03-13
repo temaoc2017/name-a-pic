@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Room <%= roomName %></title>
+    <style media="screen">
+      body, input, button {
+        font-size: 1.5rem;
+      }
+
+      body {
+        background-size: cover;
+        background-image: url("/ba.avif");
+      }
+
+      input, button {
+        box-sizing: border-box;
+      }
+      #game-container {
+        width: 100%;
+      }
+      .hand-cards-row {
+        display: flex;
+        justify-content: center;
+      }
+    </style>
+  </head>
+  <body>
+    <h3>Room <%= roomName %></h1>
+    <p>Room ID: <%= roomId %></p>
+    <ul id="players-list">
+      <% for (var i = 0; i < players.length ; i++) { %>
+        <li> <%= players[i] %> </li>
+      <% } %>
+    </ul>
+
+    <div>
+      <button type="button" name="readyButton" id="readyButton">Ready</button>
+    </div>
+    <div>
+      <button type="button" name="startButton" id="startButton">Start</button>
+    </div>
+
+    <div id="game-container">
+      <p id="current-name">Current name</p>
+      <div id="played-cards-container">
+
+      </div>
+      <div id="hand-cards-container">
+
+      </div>
+    </div>
+
+    <!-- <script src="/public/client.js"></script> -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+// Pass the room ID and name to the client-side script
+let roomId = '<%= roomId %>';
+let roomName = '<%= roomName %>';
+let playerName = '<%= playerName %>';
+let socket = io();
+
+let isReady = false;
+let isNamingCard = false;
+let votedThisRound = false;
+
+
+socket.on('join room success', () => {
+  console.log('join room success');
+});
+
+socket.on('new player', (players) => {
+  // console.log(players);
+  playersList = document.getElementById("players-list")
+  playersList.innerHTML = "";
+
+  for (var i = 0; i < players.length ; i++) {
+    playersList.innerHTML += `<li> ${players[i]} </li>\n`
+  }
+})
+
+socket.on('readiness updated', (playersReadiness) => {
+  // console.log(playersReadiness);
+  playersList = document.getElementById("players-list")
+  playersList.innerHTML = "";
+
+  for (var i = 0; i < playersReadiness.length ; i++) {
+    let color = "black";
+    if (playersReadiness[i].isReady) {
+      color = "green"
+    }
+    playersList.innerHTML += `<li style="color:${color}"> ${playersReadiness[i].name} </li>\n`
+  }
+})
+
+document.getElementById('readyButton').onclick = function() {
+  isReady = !isReady;
+
+  if (isReady) {
+    this.innerHTML = "Not Ready"
+  } else {
+    this.innerHTML = "Ready"
+  }
+
+  socket.emit('update readiness', roomId, playerName, isReady)
+}
+
+document.getElementById('startButton').onclick = function() {
+  socket.emit('try start game', roomId)
+}
+
+socket.on('start error few players', () => {
+  alert("Too few players!")
+});
+
+socket.on('start error not ready', () => {
+  alert("Not everybody is ready!")
+});
+
+socket.on('game started', (currentPlayerName, handCards) => {
+  console.log(currentPlayerName);
+  if (currentPlayerName == playerName) {
+    isNamingCard = true;
+  } else {
+    isNamingCard = false;
+  }
+
+  let cardsContainer = document.getElementById('hand-cards-container');
+  fillContainerWithCards(cardsContainer, handCards, chooseCardCallback, true);
+})
+
+function chooseCardCallback() {
+  if (isNamingCard && this.parentElement.lastChild.value == "") {
+    alert("Name this card!");
+  } else {
+    socket.emit('choose card', roomId,
+                getCardFileNameFromUrl(this.src),
+                this.parentElement.lastChild.value);
+  }
+}
+
+function fillContainerWithCards(domContainer, cardsImagesSrcs, callback, addTextInput) {
+  domContainer.innerHTML = "";
+  for (let i = 0; i < cardsImagesSrcs.length; ) {
+    let cardsRowDiv = document.createElement('div');
+    cardsRowDiv.classList.add('hand-cards-row');
+
+    for (let j = 0; j < 4 && i < cardsImagesSrcs.length; j++, i++) {
+      let cardImageSrc = cardsImagesSrcs[i];
+      let cardDiv = createCardNode(cardImageSrc, callback, addTextInput);
+      cardsRowDiv.appendChild(cardDiv);
+    }
+    domContainer.appendChild(cardsRowDiv);
+  }
+}
+
+function createCardNode(cardImageSrc, callback, addTextInput) {
+  let cardDiv = document.createElement('div');
+  cardDiv.style.flex = "0 0 23%";
+  cardDiv.style.padding = "5px";
+  cardDiv.style.marginLeft = "5px";
+  cardDiv.style.marginBottom = "5px";
+  // cardDiv.style.display = "inline-block";
+  cardDiv.style.borderBox = "margin-box";
+  cardDiv.style.border = "solid";
+  cardDiv.style.borderRadius = "5px";
+  let cardImg = document.createElement('img');
+  cardImg.style.width = "100%";
+  cardImg.src = "/cards/" + cardImageSrc;
+  cardImg.ondblclick = callback;
+  let cardText = document.createElement('input');
+  cardText.style.width = "100%";
+  cardText.type = "text";
+  cardText.placeholder = "Prepare a name here";
+
+  cardDiv.appendChild(cardImg);
+  if (addTextInput) {
+    cardDiv.appendChild(cardText);
+  }
+
+  return cardDiv;
+}
+
+socket.on('card name chosen', (cardName) => {
+  document.getElementById('current-name').textContent = cardName;
+  console.log(cardName);
+});
+
+socket.on('card chosen', (readyPlayersList) => {
+  console.log(readyPlayersList);
+});
+
+socket.on('all cards chosen', (cardsList) => {
+  let cardsContainer = document.getElementById('played-cards-container');
+  fillContainerWithCards(cardsContainer, cardsList, voteForCardCallback, false);
+
+  console.log(cardsList);
+});
+
+socket.on('new round', (currentPlayerName, handCards, playerScores) => {
+  document.getElementById('played-cards-container').innerHTML = "";
+  document.getElementById('current-name').textContent = "Card is being chosen";
+  if (currentPlayerName == playerName) {
+    isNamingCard = true;
+  } else {
+    isNamingCard = false;
+  }
+
+  let handCardsContainer = document.getElementById('played-cards-container');
+  let oldHandMatchFound = new Array(handCards).fill(false);
+  let newHandMatchFound = new Array(handCards).fill(false);
+  for (let i = 0; i < handCardsContainer.children.length; i++) {
+    for (let j = 0; j < handCards.length; j++) {
+      let imageName = getCardFileNameFromUrl(handCardsContainer.children[i].firstChild.src);
+      if (imageName == handCards[j]) {
+        oldHandMatchFound[i] = true;
+        newHandMatchFound[j] = true;
+        break;
+      }
+    }
+  }
+  for (let i = 0; i < handCardsContainer.children.length; i++) {
+    if (!oldHandMatchFound) {
+      handCardsContainer.removeChild(handCardsContainer.children[i]);
+      break;
+    }
+  }
+  for (let i = 0; i < handCards.length; i++) {
+    if (!newHandMatchFound) {
+      handCardsContainer.appendChild(createCardNode(handCards[i], chooseCardCallback, true));
+      break;
+    }
+  }
+
+  // update scores
+
+
+});
+
+function voteForCardCallback() {
+  if (isNamingCard) {
+    alert("You have no voting rights");
+  } else if (!votedThisRound) {
+    socket.emit('vote card', roomId, getCardFileNameFromUrl(this.src));
+    votedThisRound = true;
+  }
+}
+
+function getCardFileNameFromUrl(src) {
+  let index = src.lastIndexOf("/") + 1;
+  let filename = src.substr(index);
+  return filename;
+}
+
+
+socket.emit('join room', roomId, playerName)
+
+socket.on('join room success', () => {
+  socket.emit('update readiness', roomId, playerName, isReady)
+})
+
+
+// Call a function in the client-side script to initialize the game
+// initGame(socket, roomId, roomName);
+    </script>
+  </body>
+</html>

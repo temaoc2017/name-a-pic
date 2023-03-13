@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Card Game</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        margin: 0;
+        padding: 0;
+      }
+
+      header {
+        background-color: #333;
+        color: white;
+        padding: 10px;
+      }
+
+      main {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 20px;
+      }
+
+      h1 {
+        font-size: 32px;
+        margin: 0;
+      }
+
+      form {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin: 20px;
+        padding: 20px;
+        border: 2px solid #333;
+        border-radius: 10px;
+      }
+
+      label {
+        font-size: 24px;
+        margin-bottom: 10px;
+      }
+
+      input {
+        font-size: 24px;
+        padding: 10px;
+        margin-bottom: 20px;
+        border: 2px solid #ccc;
+        border-radius: 5px;
+        width: 100%;
+        max-width: 400px;
+        box-sizing: border-box;
+      }
+
+      button {
+        font-size: 24px;
+        padding: 10px;
+        background-color: #333;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+
+      button:hover {
+        background-color: #666;
+      }
+
+      ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+
+      li {
+        margin: 10px;
+        padding: 10px;
+        background-color: #ccc;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+
+      li:hover {
+        background-color: #eee;
+      }
+
+      .card {
+        background-color: #333;
+        color: white;
+        padding: 10px;
+        border-radius: 5px;
+        margin-top: 20px;
+        text-align: center;
+        font-size: 24px;
+        cursor: pointer;
+      }
+
+      .card:hover {
+        background-color: #666;
+      }
+
+      #cards {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Card Game</h1>
+    </header>
+    <main>
+      <div id="join-form">
+        <h2>Join or create a room</h2>
+        <form action="/rooms" method="post">
+          <label for="roomName">Room name:</label>
+          <input type="text" id="roomName" name="roomName" required>
+          <label for="playerName">Player name:</label>
+          <input type="text" id="playerName" name="playerName" required>
+          <button type="submit">Create/Join room</button>
+        </form>
+      </div>
+      <div id="room">
+        <h2>Room <span id="room-id"></span></h2>
+        <ul id="players"></ul>
+        <div id="start-button"></div>
+        <div id="cards"></div>
+        <button id="leave-button">Leave room</button>
+      </div>
+      <div id="error-message"></div>
+    </main>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+// Define the socket.io client
+// const socket = io();
+
+// Get DOM elements
+const joinForm = document.getElementById('join-form');
+const nameInput = document.getElementById('roomName');
+const playerNameInput = document.getElementById('playerName');
+const roomIdSpan = document.getElementById('room-id');
+const playersList = document.getElementById('players');
+const startButton = document.getElementById('start-button');
+const cardsDiv = document.getElementById('cards');
+const leaveButton = document.getElementById('leave-button');
+const errorMessageDiv = document.getElementById('error-message');
+
+// Hide the room initially
+document.getElementById('room').style.display = 'none';
+
+
+// want to use sockets in-game only
+// joinForm.addEventListener('submit', event => {
+//   event.preventDefault();
+//
+//   // Get the name and create a room
+//   const roomName = nameInput.value;
+//   const playerName = playerNameInput.value;
+//   socket.emit('create room', roomName, playerName);
+// });
+
+// // Handle room creation success
+// function handleRoomCreated(roomId) {
+//   // Display the room and its ID
+//   joinForm.style.display = 'none';
+//   document.getElementById('room').style.display = 'block';
+//   roomIdSpan.textContent = roomId;
+//
+//   // Add a listener for the start button
+//   startButton.innerHTML = '<button>Start game</button>';
+//   startButton.addEventListener('click', () => {
+//     socket.emit('start game');
+//   });
+//
+//   // Add a listener for the leave button
+//   leaveButton.addEventListener('click', () => {
+//     socket.emit('leave room');
+//     joinForm.style.display = 'block';
+//     document.getElementById('room').style.display = 'none';
+//     playersList.innerHTML = '';
+//     cardsDiv.innerHTML = '';
+//     errorMessageDiv.textContent = '';
+//   });
+//
+//   // Add a listener for error messages
+//   socket.on('error message', errorMessage => {
+//     errorMessageDiv.textContent = errorMessage;
+//   });
+//
+//   // Add a listener for players joining the room
+//   socket.on('player joined', players => {
+//     playersList.innerHTML = '';
+//     players.forEach(player => {
+//       const li = document.createElement('li');
+//       li.textContent = player.name;
+//       playersList.appendChild(li);
+//     });
+//   });
+//
+//   // Add a listener for players leaving the room
+//   socket.on('player left', players => {
+//     playersList.innerHTML = '';
+//     players.forEach(player => {
+//       const li = document.createElement('li');
+//       li.textContent = player.name;
+//       playersList.appendChild(li);
+//     });
+//   });
+// }
+//
+// // Add a listener for card clicks
+// cardsDiv.addEventListener('click', event => {
+//   const card = event.target;
+//   if (card.classList.contains('card')) {
+//     card.classList.toggle('selected');
+//   }
+// });
+
+// Export the socket for debugging purposes
+// window.socket = socket;
+    </script>
+  </body>
+</html>
