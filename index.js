@@ -47,6 +47,7 @@ const roomSchema = new mongoose.Schema({
   gameInProgress: { type: Boolean, default: false },
   currentPlayer: Number,
   currentName: String,
+  votingStage: { type: Boolean, default: false },
   drawPile: [String],
   discardPile: [String],
   roundNumber: { type: Number, default: 1 },
@@ -132,15 +133,25 @@ io.on('connection', (socket) => {
           throw "No player name"
         }
 
-        room = await addPlayer(room, { name: playerName, id: socket.id })
+        let existingPlayer = getPlayerByName(room, playerName);
+        if (existingPlayer) {
+          existingPlayer.id = socket.id;
+        } else {
+          room = await addPlayer(room, { name: playerName, id: socket.id })
+        }
         await room.save();
 
         socket.join(roomId);
 
-        // TODO: send info is game is in progress and page was reloaded
-
         socket.emit('join room success');
-        io.in(roomId).emit('new player', getPlayersNames(room));
+
+        if (!room.gameInProgress) {
+          io.in(roomId).emit('new player', getPlayersNames(room));
+        } else {
+          let player = getPlayerByName(room, playerName);
+          // TODO: send chosen cards only when they all are chosen
+          socket.emit('game started', room.players[room.currentPlayer].name, player.cards, getPlayersWithScores(room), room.currentName, shuffleArray(getChosenCards(room)))
+        }
       } catch (error) {
         if (error instanceof mongoose.Error.VersionError) {
           throw error;
@@ -175,7 +186,6 @@ io.on('connection', (socket) => {
         return;
       }
 
-      // TODO: make it a function
       room = resetForNewGame(room);
 
       await room.save();
@@ -190,24 +200,42 @@ io.on('connection', (socket) => {
     await retryUntilSaved(async (roomId, cardSrc, cardName) => {
       let room = await Room.findById(roomId);
 
-      if (getPlayerCard(room, socket.id) != "" || !room.gameInProgress) {
+      if (!room.gameInProgress) {
         return;
       }
 
       if (playerIsNaming(room, socket.id)) {
-        room.currentName = cardName;
-        room = setPlayerCard(room, socket.id, cardSrc);
-        await room.save();
+        if (getPlayerCard(room, socket.id) == "") {
+          room.currentName = cardName;
+          room = updatePlayerCard(room, socket.id, cardSrc);
+          await room.save();
 
-        io.in(roomId).emit('card name chosen', cardName);
-      } else if (room.currentName != "") {
-        room = setPlayerCard(room, socket.id, cardSrc);
+          io.in(roomId).emit('card name chosen', cardName);
+        }
+      } else if (room.currentName != "" && !room.votingStage) {
+        room = updatePlayerCard(room, socket.id, cardSrc);
         await room.save();
 
         if (getPlayersWithChosenCards(room).length == room.players.length) {
-          io.in(roomId).emit('all cards chosen', shuffleArray(getCards(room)));
+          (async () => {
+            let room = await Room.findById(roomId);
+            if (getPlayersWithChosenCards(room).length != room.players.length) {
+              return;
+            }
+            room.votingStage = true;
+            await sleep(3000);
+            try {
+              await room.save();
+              io.in(roomId).emit('all cards chosen', shuffleArray(getChosenCards(room)));
+            } catch (error) {
+              if (!(error instanceof mongoose.Error.VersionError)) {
+                throw error;
+              }
+            }
+          })();
         } else {
           io.in(roomId).emit('card chosen', getPlayersWithChosenCards(room));
+          console.log('card chosen');
         }
       }
     }, roomId, cardSrc, cardName)
@@ -227,18 +255,20 @@ io.on('connection', (socket) => {
           return;
         }
       }
-
       if (playerIsNaming(room, socket.id)) {
         return;
-      } else if (getPlayersWithChosenCards(room).length == room.players.length) {
+      }
+
+      if (getPlayersWithChosenCards(room).length == room.players.length) {
         room = setPlayerVote(room, socket.id, cardSrc);
 
         if (countPlayersWithVotedCards(room) == room.players.length - 1) {
+          let roundSummary = getRoundSummary(room);
           room = resetForNewRound(room);
           await room.save();
 
           for (let player of room.players) {
-            io.to(player.id).emit('new round', room.players[room.currentPlayer].name, player.cards, getPlayersWithScores(room));
+            io.to(player.id).emit('new round', room.players[room.currentPlayer].name, player.cards, getPlayersWithScores(room), Array.from(roundSummary));
           }
         } else {
           await room.save();
@@ -257,7 +287,7 @@ io.on('connection', (socket) => {
 
 function getPlayersNames(room) {
   let playersList = [];
-  for (player of room.players) {
+  for (let player of room.players) {
     playersList.push(player.name);
   }
   return playersList;
@@ -265,7 +295,7 @@ function getPlayersNames(room) {
 
 function getPlayersReadiness(room) {
   let playersReadinessList = [];
-  for (player of room.players) {
+  for (let player of room.players) {
     playersReadinessList.push({ name: player.name, isReady: player.isReady });
   }
   return playersReadinessList;
@@ -302,7 +332,7 @@ async function updatePlayerReadiness(room, playerName, isReady) {
 
 function getReadyPlayersCount(room) {
   let readyPlayersCount = 0;
-  for (player of room.players) {
+  for (let player of room.players) {
     if (player.isReady) readyPlayersCount++;
   }
   return readyPlayersCount;
@@ -312,6 +342,12 @@ function getCardsNames() {
   let fileNames = fs.readdirSync('public/cards/');
   let imagePattern = /\.(jpg|png|jpeg|gif)$/;
   fileNames = fileNames.filter(fileName => fileName.match(imagePattern) != null)
+  for (let i = 156; i <= 211; i++) {
+    fileNames.push("https://cdn.glitch.global/c2723664-fc3b-43a0-9809-d919707a7e64/" + i + ".jpg")
+  }
+  for (let i = 212; i <= 271; i++) {
+    fileNames.push("https://cdn.glitch.global/c2723664-fc3b-43a0-9809-d919707a7e64/" + i + ".jpeg")
+  }
   return fileNames;
 }
 
@@ -330,10 +366,14 @@ function playerIsNaming(room, playerId) {
   return room.players[room.currentPlayer].id == playerId;
 }
 
-function setPlayerCard(room, playerId, cardSrc) {
+function updatePlayerCard(room, playerId, cardSrc) {
   for (let i = 0; i < room.players.length; i++) {
     if (room.players[i].id == playerId) {
-      room.players[i].chosenCard = cardSrc;
+      if (room.players[i].chosenCard == cardSrc) {
+        room.players[i].chosenCard = "";
+      } else {
+        room.players[i].chosenCard = cardSrc;
+      }
       break;
     }
   }
@@ -348,9 +388,18 @@ function getPlayerCard(room, playerId) {
   }
 }
 
+function getPlayerByName(room, playerName) {
+  for (let i = 0; i < room.players.length; i++) {
+    if (room.players[i].name == playerName) {
+      return room.players[i];
+    }
+  }
+  return;
+}
+
 function getPlayersWithChosenCards(room) {
   let readyPlayersList = [];
-  for (player of room.players) {
+  for (let player of room.players) {
     if (player.chosenCard != "") {
       readyPlayersList.push(player.name);
     }
@@ -358,9 +407,9 @@ function getPlayersWithChosenCards(room) {
   return readyPlayersList;
 }
 
-function getCards(room) {
+function getChosenCards(room) {
   let cardsList = [];
-  for (player of room.players) {
+  for (let player of room.players) {
     cardsList.push(player.chosenCard);
   }
   return cardsList;
@@ -397,7 +446,7 @@ function setPlayerVote(room, playerId, cardSrc) {
 
 function countPlayersWithVotedCards(room) {
   let readyPlayersCount = 0;
-  for (player of room.players) {
+  for (let player of room.players) {
     if (player.votedCard != "") {
       readyPlayersCount++;
     }
@@ -461,6 +510,7 @@ function resetForNewRound(room) {
 
   room.currentPlayer = (room.currentPlayer + 1) % room.players.length;
   room.currentName = "";
+  room.votingStage = false;
   room.roundNumber++;
 
   return room;
@@ -468,6 +518,7 @@ function resetForNewRound(room) {
 
 function resetForNewGame(room) {
   room.gameInProgress = true;
+  room.votingStage = false;
   room.currentName = "";
   room.roundNumber = 0;
 
@@ -504,13 +555,35 @@ function resetForNewGame(room) {
 
 function getPlayersWithScores(room) {
   let playersReadinessList = [];
-  for (player of room.players) {
+  for (let player of room.players) {
     playersReadinessList.push({ name: player.name, score: player.score });
   }
   return playersReadinessList;
 }
 
+function getRoundSummary(room) {
+  let summary = new Map();
 
+  for (let player of room.players) {
+    let card = player.chosenCard;
+    let cardSummary = {};
+    cardSummary.correctCard = false;
+    if (player.name == room.players[room.currentPlayer].name) {
+      cardSummary.correctCard = true;
+    }
+    cardSummary.cardOwner = player.name;
+    cardSummary.playersVoted = [];
+    summary.set(card, cardSummary);
+  }
+
+  for (let player of room.players) {
+    if (player.votedCard) {
+      summary.get(player.votedCard).playersVoted.push(player.name);
+    }
+  }
+
+  return summary;
+}
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));

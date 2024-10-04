@@ -3,7 +3,14 @@
   <head>
     <meta charset="utf-8">
     <title>Room <%= roomName %></title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
+          integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm"
+          crossorigin="anonymous">
     <style media="screen">
+      * {
+  			box-sizing: border-box;
+  		}
+
       body, input, button {
         font-size: 1.5rem;
       }
@@ -16,45 +23,163 @@
       input, button {
         box-sizing: border-box;
       }
+
+      #room-name, #current-player-and-name {
+        text-align: center;
+        border-radius: 15px;
+        background-color: rgba(200, 100, 200, 0.3);
+      }
+
+      #ingame-players-list {
+        text-align: center;
+        border-radius: 15px;
+        background-color: rgba(255, 100, 100, 0.3);
+      }
+
       #game-container {
         width: 100%;
       }
-      .hand-cards-row {
+
+      #played-cards-container, #hand-cards-container {
         display: flex;
+        flex-wrap: wrap;
         justify-content: center;
+      }
+
+      #pregame-container, #game-container {
+        margin-top: 50px;
+      }
+
+      body {
+  			margin: 0;
+  			padding: 0;
+  			font-family: sans-serif;
+  			background-color: #f2f2f2;
+  		}
+
+      .container {
+  			max-width: 1200px;
+  			margin: 0 auto;
+  			padding: 20px;
+  		}
+
+  		.row {
+  			display: flex;
+  			flex-wrap: wrap;
+  			margin: -20px;
+  		}
+
+  		.card {
+  			flex: 1 1 300px;
+  			margin: 10px;
+  			padding: 10px;
+        max-width: calc(25% - 20px);
+  			background-color: #fff;
+  			box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  			transition: all 0.3s ease;
+  		}
+
+  		.card:hover {
+  			transform: translateY(-10px);
+  			box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+  		}
+
+  		.card img {
+  			display: block;
+  			margin: 0 auto;
+  			max-width: 100%;
+  			height: auto;
+  		}
+
+  		.card h2 {
+  			margin-top: 0;
+  			font-size: 1.5em;
+  			font-weight: normal;
+  		}
+
+  		.card p {
+  			margin-bottom: 0;
+  			font-size: 1.2em;
+  			line-height: 1.5;
+  		}
+
+      @media screen and (max-width: 1080px) {
+        .card {
+          max-width: calc(33.33% - 20px);
+        }
+      }
+
+      @media screen and (max-width: 768px) {
+        .card {
+          max-width: calc(50% - 20px);
+        }
+      }
+
+      @media screen and (max-width: 576px) {
+        .card {
+          max-width: calc(100% - 20px);
+        }
       }
     </style>
   </head>
   <body>
-    <h3>Room <%= roomName %></h1>
-
-    <div id="pregame-container">
-      <ul id="players-list">
-        <% for (var i = 0; i < players.length ; i++) { %>
-          <li> <%= players[i] %> </li>
-        <% } %>
-      </ul>
-
-      <div>
-        <button type="button" name="readyButton" id="readyButton">Ready</button>
+    <div class="container">
+      <div class="row justify-content-center mt-3">
+        <div class="col-md-6">
+          <h3 id="room-name" class="text-center">Room <%= roomName %></h3>
+        </div>
       </div>
-      <div>
-        <button type="button" name="startButton" id="startButton">Start</button>
+
+      <div id="pregame-container" class="pb-4">
+        <div class="row justify-content-center">
+          <div class="col-md-6">
+            <ul id="players-list" class="list-group list-group-flush">
+              <% for (var i = 0; i < players.length ; i++) { %>
+                <li class="list-group-item text-center"> <%= players[i] %> </li>
+              <% } %>
+            </ul>
+          </div>
+        </div>
+
+        <div class="row justify-content-center mt-3">
+          <div class="col-md-6">
+            <button type="button" name="readyButton" id="readyButton" class="btn btn-primary btn-block">Ready</button>
+          </div>
+        </div>
+
+        <div class="row justify-content-center mt-3">
+          <div class="col-md-6">
+            <button type="button" name="startButton" id="startButton" class="btn btn-success btn-block">Start</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="game-container">
+        <div class="row justify-content-center mb-4">
+          <div class="col-md-6">
+            <ul id="ingame-players-list" class="list-group list-group-flush">&nbsp;</ul>
+          </div>
+        </div>
+
+        <div class="row justify-content-center mb-4">
+          <div class="col-md-6">
+            <p id="current-player-and-name" class="text-center mb-2"><span id="current-player"></span><span id="current-name">choosing a card</span></p>
+          </div>
+        </div>
+
+        <div class="row justify-content-center mb-4">
+          <div class="col-md-12">
+            <div id="played-cards-container"></div>
+          </div>
+        </div>
+
+        <div class="row justify-content-center mb-4">
+          <div class="col-md-12">
+            <div id="hand-cards-container"></div>
+          </div>
+        </div>
       </div>
     </div>
-
-    <div id="game-container">
-      <div id="ingame-players-list">&nbsp;</div>
-      <p id="current-name">Current name</p>
-      <div id="played-cards-container">
-
-      </div>
-      <div id="hand-cards-container">
-
-      </div>
-    </div>
-
-    <!-- <script src="/public/client.js"></script> -->
     <script src="/socket.io/socket.io.js"></script>
     <script>
 // Pass the room ID and name to the client-side script
@@ -65,7 +190,6 @@ let socket = io();
 
 let isReady = false;
 let isNamingCard = false;
-let votedThisRound = false;
 
 
 socket.on('join room success', () => {
@@ -121,13 +245,16 @@ socket.on('start error not ready', () => {
 });
 
 socket.on('vote error voted self', () => {
-  votedThisRound = false;
+  // votedThisRound = false;
   alert("Don't vote your card!");
 });
 
 
-socket.on('game started', (currentPlayerName, handCards, playersWithScores) => {
-  console.log(currentPlayerName);
+socket.on('game started', (currentPlayerName, handCards, playersWithScores, currentName, playedCards) => {
+  document.getElementById('current-player').textContent = currentPlayerName + " - ";
+  if (currentName) {
+    document.getElementById('current-name').textContent = currentName;
+  }
   if (currentPlayerName == playerName) {
     isNamingCard = true;
   } else {
@@ -139,6 +266,12 @@ socket.on('game started', (currentPlayerName, handCards, playersWithScores) => {
   let cardsContainer = document.getElementById('hand-cards-container');
   fillContainerWithCards(cardsContainer, handCards, chooseCardCallback, true);
 
+  if (playedCards && playedCards[0] != "") {
+    console.log(playedCards);
+    let cardsContainer = document.getElementById('played-cards-container');
+    fillContainerWithCards(cardsContainer, playedCards, voteForCardCallback, false);
+  }
+
   displayPlayersWithScores(playersWithScores);
 })
 
@@ -146,6 +279,9 @@ function chooseCardCallback() {
   if (isNamingCard && this.parentElement.lastChild.value == "") {
     alert("Name this card!");
   } else {
+    let wasGray = (this.parentElement.style.backgroundColor == "dimgray");
+    resetCardsBackground(document.getElementById("hand-cards-container"));
+    this.parentElement.style.backgroundColor = wasGray ? "white" : "dimgray";
     socket.emit('choose card', roomId,
                 getCardFileNameFromUrl(this.src),
                 this.parentElement.lastChild.value);
@@ -154,33 +290,24 @@ function chooseCardCallback() {
 
 function fillContainerWithCards(domContainer, cardsImagesSrcs, callback, addTextInput) {
   domContainer.innerHTML = "";
-  for (let i = 0; i < cardsImagesSrcs.length; ) {
-    let cardsRowDiv = document.createElement('div');
-    cardsRowDiv.classList.add('hand-cards-row');
-
-    for (let j = 0; j < 4 && i < cardsImagesSrcs.length; j++, i++) {
-      let cardImageSrc = cardsImagesSrcs[i];
-      let cardDiv = createCardNode(cardImageSrc, callback, addTextInput);
-      cardsRowDiv.appendChild(cardDiv);
-    }
-    domContainer.appendChild(cardsRowDiv);
+  for (let i = 0; i < cardsImagesSrcs.length; i++) {
+    let cardImageSrc = cardsImagesSrcs[i];
+    let cardDiv = createCardNode(cardImageSrc, callback, addTextInput);
+    domContainer.appendChild(cardDiv);
   }
 }
 
 function createCardNode(cardImageSrc, callback, addTextInput) {
   let cardDiv = document.createElement('div');
-  cardDiv.style.flex = "0 0 23%";
-  cardDiv.style.padding = "5px";
-  cardDiv.style.marginLeft = "5px";
-  cardDiv.style.marginBottom = "5px";
-  // cardDiv.style.display = "inline-block";
-  cardDiv.style.borderBox = "margin-box";
-  cardDiv.style.border = "solid";
-  cardDiv.style.borderRadius = "5px";
+  cardDiv.classList.add('card');
   let cardImg = document.createElement('img');
   cardImg.style.width = "100%";
   cardImg.src = "/cards/" + cardImageSrc;
-  cardImg.ondblclick = callback;
+  let linkPattern = /^https:\/\//;
+  if (cardImageSrc.match(linkPattern) != null) {
+    cardImg.src = cardImageSrc;
+  }
+  cardImg.onclick = callback;
   let cardText = document.createElement('input');
   cardText.style.width = "100%";
   cardText.type = "text";
@@ -210,10 +337,32 @@ socket.on('all cards chosen', (cardsList) => {
   console.log(cardsList);
 });
 
-socket.on('new round', (currentPlayerName, handCards, playersWithScores) => {
-  votedThisRound = false;
-  document.getElementById('played-cards-container').innerHTML = "";
-  document.getElementById('current-name').textContent = "Card is being chosen";
+socket.on('new round', (currentPlayerName, handCards, playersWithScores, roundSummary) => {
+  roundSummary = new Map(roundSummary);
+  console.log(roundSummary);
+  // document.getElementById('played-cards-container').innerHTML = "";
+  for (let card of document.getElementById("played-cards-container").children) {
+    let cardName = getCardFileNameFromUrl(card.firstChild.src);
+    let newP = document.createElement('p');
+    newP.setAttribute('style', 'white-space: pre;');
+    newP.setAttribute('style', 'overflow-wrap: break-word;');
+    newP.textContent = `Played: ${roundSummary.get(cardName).cardOwner}`;
+    if (roundSummary.get(cardName).playersVoted.length > 0) {
+      newP.textContent += `\nVoted: ${roundSummary.get(cardName).playersVoted}`;
+    }
+    newP.style.textShadow = "3px 3px 6px black";
+    newP.style.borderRadius = "10px 10px 0 0";
+    newP.style.padding = "5px";
+    newP.style.backgroundColor = "#fddb";
+    newP.style.position = "absolute";
+    let cardPadding = window.getComputedStyle(card, null).getPropertyValue('padding')
+    newP.style.bottom = newP.style.left = cardPadding;
+    console.log(cardPadding);
+    newP.style.width = `calc(100% - ${cardPadding} - ${cardPadding})`;
+    card.appendChild(newP);
+  }
+  document.getElementById('current-player').textContent = currentPlayerName + " - ";
+  document.getElementById('current-name').textContent = "choosing a card";
   if (currentPlayerName == playerName) {
     isNamingCard = true;
   } else {
@@ -226,47 +375,30 @@ socket.on('new round', (currentPlayerName, handCards, playersWithScores) => {
   let currentHandCard = 0;
 
   for (let i = 0; i < handCardsContainer.children.length; i++) {
-    let handCardsRow = handCardsContainer.children[i];
-    for (let j = 0; j < handCardsRow.children.length; j++) {
-      let imageName = getCardFileNameFromUrl(handCardsRow.children[j].firstChild.src);
-      for (let k = 0; k < handCards.length; k++) {
-        if (imageName == handCards[k]) {
-          oldHandMatchFound[currentHandCard] = true;
-          newHandMatchFound[k] = true;
-          break;
-        }
+    let imageName = getCardFileNameFromUrl(handCardsContainer.children[i].firstChild.src);
+    for (let j = 0; j < handCards.length; j++) {
+      if (imageName == handCards[j]) {
+        oldHandMatchFound[i] = true;
+        newHandMatchFound[j] = true;
+        break;
       }
-      currentHandCard++;
     }
   }
 
   currentHandCard = 0;
   let removedChild = false;
   for (let i = 0; i < handCardsContainer.children.length; i++) {
-    let row = handCardsContainer.children[i];
     if (!removedChild) {
-      for (let j = 0; j < row.children.length; j++) {
-        if (!oldHandMatchFound[currentHandCard]) {
-          row.removeChild(row.children[j]);
-          removedChild = true;
-          break;
-        } else {
-          currentHandCard++;
-        }
-      }
-    }
-    if (removedChild) {
-      if (i + 1 < handCardsContainer.children.length) {
-        let nextRow = handCardsContainer.children[i + 1];
-        let card = nextRow.removeChild(nextRow.firstChild);
-        row.appendChild(card);
+      if (!oldHandMatchFound[i]) {
+        handCardsContainer.removeChild(handCardsContainer.children[i]);
+        removedChild = true;
       }
     }
   }
 
   for (let i = 0; i < newHandMatchFound.length; i++) {
     if (!newHandMatchFound[i]) {
-      handCardsContainer.lastChild.appendChild(createCardNode(handCards[i], chooseCardCallback, true));
+      handCardsContainer.appendChild(createCardNode(handCards[i], chooseCardCallback, true));
       break;
     }
   }
@@ -277,26 +409,42 @@ socket.on('new round', (currentPlayerName, handCards, playersWithScores) => {
 function voteForCardCallback() {
   if (isNamingCard) {
     alert("You have no voting rights");
-  } else if (!votedThisRound) {
+  } else {
+    // let wasGray = (this.parentElement.style.backgroundColor == "dimgray")
+    resetCardsBackground(document.getElementById("played-cards-container"));
+    this.parentElement.style.backgroundColor = "dimgray";
     socket.emit('vote card', roomId, getCardFileNameFromUrl(this.src));
-    votedThisRound = true;
   }
 }
 
 function getCardFileNameFromUrl(src) {
   let index = src.lastIndexOf("/") + 1;
   let filename = src.substr(index);
+  let linkPattern = /^https:\/\/cdn/;
+  if (src.match(linkPattern) != null) {
+    filename = src;
+  }
+  console.log(filename)
   return filename;
 }
 
 function displayPlayersWithScores(playersWithScores) {
-  let playersDiv = document.getElementById("ingame-players-list");
-  playersDiv.innerHTML = "";
+  let playersListDiv = document.getElementById('ingame-players-list');
+  playersListDiv.innerHTML = "";
+
   for (let i = 0; i < playersWithScores.length; i++) {
-    let playerSpan = document.createElement('span');
-    playerSpan.style.marginRight = "15px";
-    playerSpan.textContent = `${playersWithScores[i].name} : ${playersWithScores[i].score}`;
-    playersDiv.appendChild(playerSpan);
+    let playerName = playersWithScores[i].name;
+    let playerScore = playersWithScores[i].score;
+    let playerDiv = document.createElement('div');
+    playerDiv.innerHTML = `${playerName}: ${playerScore}`;
+
+    playersListDiv.appendChild(playerDiv);
+  }
+}
+
+function resetCardsBackground(cardsContainer) {
+  for (let card of cardsContainer.children) {
+    card.style.background = "white";
   }
 }
 
