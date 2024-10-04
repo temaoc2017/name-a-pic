@@ -103,6 +103,21 @@
   			line-height: 1.5;
   		}
 
+      #preview {
+        visibility: hidden;
+        border-radius: 10px;
+        border-width: 5px;
+        border-color: antiquewhite;
+      }
+
+      .center-screen {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        margin-right: -50%;
+        transform: translate(-50%, -50%);
+      }
+
       @media screen and (max-width: 1080px) {
         .card {
           max-width: calc(33.33% - 20px);
@@ -180,6 +195,7 @@
         </div>
       </div>
     </div>
+    <img id="preview" class="center-screen"></img>
     <script src="/socket.io/socket.io.js"></script>
     <script>
 // Pass the room ID and name to the client-side script
@@ -235,6 +251,11 @@ document.getElementById('readyButton').onclick = function() {
 document.getElementById('startButton').onclick = function() {
   socket.emit('try start game', roomId)
 }
+
+document.getElementById('preview').onclick = function(e) {
+  document.getElementById('preview').style.visibility = "hidden";
+}
+
 
 socket.on('start error few players', () => {
   alert("Too few players!")
@@ -297,6 +318,13 @@ function fillContainerWithCards(domContainer, cardsImagesSrcs, callback, addText
   }
 }
 
+function previewEventListener(e) {
+  e.preventDefault();
+  document.getElementById('preview').src = e.srcElement.src;
+  document.getElementById('preview').style.visibility = "visible";
+  return true;
+}
+
 function createCardNode(cardImageSrc, callback, addTextInput) {
   let cardDiv = document.createElement('div');
   cardDiv.classList.add('card');
@@ -308,6 +336,7 @@ function createCardNode(cardImageSrc, callback, addTextInput) {
     cardImg.src = cardImageSrc;
   }
   cardImg.onclick = callback;
+  cardImg.addEventListener('contextmenu', previewEventListener, false);
   let cardText = document.createElement('input');
   cardText.style.width = "100%";
   cardText.type = "text";
