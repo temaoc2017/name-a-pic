@@ -149,8 +149,7 @@ io.on('connection', (socket) => {
           io.in(roomId).emit('new player', getPlayersNames(room));
         } else {
           let player = getPlayerByName(room, playerName);
-          // TODO: send chosen cards only when they all are chosen
-          socket.emit('game started', room.players[room.currentPlayer].name, player.cards, getPlayersWithScores(room), room.currentName, shuffleArray(getChosenCards(room)))
+          socket.emit('game started', room.players[room.currentPlayer].name, player.cards, getPlayersWithScores(room), room.currentName, room.votingStage ? shuffleArray(getChosenCards(room)) : null)
         }
       } catch (error) {
         if (error instanceof mongoose.Error.VersionError) {
