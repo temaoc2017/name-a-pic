@@ -521,7 +521,15 @@ function resetForNewGame(room) {
   room.currentName = "";
   room.roundNumber = 0;
 
-  room.currentPlayer = Math.floor(Math.random() * room.players.length);
+  for 
+  ( 
+    room.currentPlayer = Math.floor(Math.random() * room.players.length);
+    room.currentPlayer > 0;
+    room.currentPlayer--
+  ) 
+  {
+    room.players.push(room.players.shift());
+  }
 
   let cards = getCardsNames();
   cards = shuffleArray(cards);
