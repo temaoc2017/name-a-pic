@@ -344,7 +344,7 @@ function getCardsNames() {
   for (let i = 156; i <= 211; i++) {
     fileNames.push("https://cdn.glitch.global/c2723664-fc3b-43a0-9809-d919707a7e64/" + i + ".jpg")
   }
-  for (let i = 212; i <= 324; i++) {
+  for (let i = 212; i <= 376; i++) {
     fileNames.push("https://cdn.glitch.global/c2723664-fc3b-43a0-9809-d919707a7e64/" + i + ".jpeg")
   }
   return fileNames;
