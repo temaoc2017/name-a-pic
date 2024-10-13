@@ -58,6 +58,51 @@ const roomSchema = new mongoose.Schema({
 
 const Room = mongoose.model('Room', roomSchema);
 
+const votingCardStaticticsSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  cards:
+  [
+    {
+      name: { type: String, required: true },
+      isCorrect: { type: Boolean, default: false },
+      playersVoted: { type: Number, required: true },
+    }
+  ]
+}, {
+  optimisticConcurrency: true,
+});
+
+const VotingCardStatictics = mongoose.model('voting_card_statistics', votingCardStaticticsSchema);
+
+const choosingCardStatisticsSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  cards:
+  [
+    {
+      name: { type: String, required: true },
+      isChosen: { type: Boolean, default: false },
+    }
+  ]
+}, {
+  optimisticConcurrency: true,
+});
+
+const ChoosingCardStatistics = mongoose.model('choosing_card_statistics', choosingCardStatisticsSchema);
+
+const choosingNameStatisticsSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  cards:
+  [
+    {
+      name: { type: String, required: true },
+      isChosen: { type: Boolean, default: false },
+    }
+  ]
+}, {
+  optimisticConcurrency: true,
+});
+
+const ChoosingNameStatistics = mongoose.model('choosing_name_statistics', choosingNameStatisticsSchema);
 
 // Serve static files from the "public" directory
 app.use(express.static('public'));
@@ -208,12 +253,13 @@ io.on('connection', (socket) => {
           room.currentName = cardName;
           room = updatePlayerCard(room, socket.id, cardSrc);
           await room.save();
-
+          updateChoosingNameStatistics(room, socket.id, cardName, cardSrc);
           io.in(roomId).emit('card name chosen', cardName);
         }
       } else if (room.currentName != "" && !room.votingStage) {
         room = updatePlayerCard(room, socket.id, cardSrc);
         await room.save();
+        updateChoosingCardStatistics(room, socket.id, room.currentName, cardSrc)
 
         if (getPlayersWithChosenCards(room).length == room.players.length) {
           (async () => {
@@ -263,6 +309,15 @@ io.on('connection', (socket) => {
 
         if (countPlayersWithVotedCards(room) == room.players.length - 1) {
           let roundSummary = getRoundSummary(room);
+          let cardsStatistics = [];
+          for (const [key, value] of roundSummary) {
+            cardsStatistics.push({
+              name: key, 
+              isCorrect: value.correctCard, 
+              playersVoted: value.playersVoted.length
+            });
+          }
+          VotingCardStatictics.create({name: room.currentName, cards: cardsStatistics});
           room = resetForNewRound(room);
           await room.save();
 
@@ -590,6 +645,40 @@ function getRoundSummary(room) {
   }
 
   return summary;
+}
+
+function updateChoosingNameStatistics(room, socket_id, cardName, cardSrc) {
+  let statistics = {name: cardName, cards: [] }
+  for (const card of getPlayerHand(room, socket_id)) {
+    if (card.name == cardSrc) card.isChosen = true;
+    statistics.cards.push(card);
+  }
+  ChoosingNameStatistics.create(statistics);
+}
+
+function updateChoosingCardStatistics(room, socket_id, cardName, cardSrc) {
+  let statistics = {name: cardName, cards: [] }
+  for (const card of getPlayerHand(room, socket_id)) {
+    if (card.name == cardSrc) card.isChosen = true;
+    statistics.cards.push(card);
+  }
+  ChoosingCardStatistics.create(statistics);
+}
+
+function getPlayerById(room, id) {  
+  for (const player of room.players) {
+    if (player.id == id) {
+      return player;
+    }
+  }
+}
+
+function getPlayerHand(room, socket_id) {
+  let hand = [];
+  for (const card of getPlayerById(room, socket_id).cards) {
+    hand.push({ name: card, isChosen: false });
+  }
+  return hand;
 }
 
 function sleep(ms) {
