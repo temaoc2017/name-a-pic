@@ -190,7 +190,7 @@ io.on('connection', (socket) => {
             socket.emit('join room error', 'Game in progress');
             return;
           }
-          room = await addPlayer(room, { name: playerName, id: socket.id })
+          room = await addPlayer(room, { name: playerName, id: socket.id, ai: false })
         }
         await room.save();
 
@@ -225,7 +225,7 @@ io.on('connection', (socket) => {
     }, roomId, playerName, isReady);
   });
 
-  socket.on('try start game', async (roomId) => {
+  socket.on('try start game', async (roomId, botCount) => {
     await retryUntilSaved(async (roomId) => {
       let room = await Room.findById(roomId);
 
@@ -234,7 +234,7 @@ io.on('connection', (socket) => {
         return;
       }
       
-      if (room.players.length < 2) {
+      if (room.players.length + botCount < 2) {
         socket.emit('start error few players');
         return;
       }
@@ -242,6 +242,10 @@ io.on('connection', (socket) => {
       if (room.players.length != getReadyPlayersCount(room)) {
         socket.emit('start error not ready');
         return;
+      }
+
+      for (let i = 1; i <= botCount; i++) {
+        room = await addPlayer(room, { name: "AI " + i, id: i, ai: true })
       }
 
       room = resetForNewGame(room);
