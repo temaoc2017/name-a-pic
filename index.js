@@ -42,6 +42,7 @@ const roomSchema = new mongoose.Schema({
       votedCard: { type: String, default: "" },
       isReady: { type: Boolean, default: false },
       score: { type: Number, default: 0 },
+      ai: { type: Boolean, required: true },
     }
   ],
   gameInProgress: { type: Boolean, default: false },
@@ -75,6 +76,7 @@ const votingCardStaticticsSchema = new mongoose.Schema({
 const VotingCardStatictics = mongoose.model('voting_card_statistics', votingCardStaticticsSchema);
 
 const choosingCardStatisticsSchema = new mongoose.Schema({
+  ai: { type: Boolean, required: true },
   name: { type: String, required: true },
   cards:
   [
@@ -90,6 +92,7 @@ const choosingCardStatisticsSchema = new mongoose.Schema({
 const ChoosingCardStatistics = mongoose.model('choosing_card_statistics', choosingCardStatisticsSchema);
 
 const choosingNameStatisticsSchema = new mongoose.Schema({
+  ai: { type: Boolean, required: true },
   name: { type: String, required: true },
   cards:
   [
