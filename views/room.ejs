@@ -35,6 +35,26 @@
         border-radius: 15px;
         background-color: rgba(255, 100, 100, 0.3);
       }
+      
+      li > button {
+        background-color: rgba(255, 100, 100, 0.3);
+        border-radius: 35px;
+        visibility: hidden;
+      }
+      
+      li:hover > button {
+        visibility: visible;
+      }
+      
+      #ingame-players-list button {
+        background-color: rgba(255, 100, 100, 0.3);
+        border-radius: 35px;
+        visibility: hidden;
+      }
+      
+      #ingame-players-list:hover button {
+        visibility: visible;
+      }
 
       #game-container {
         width: 100%;
@@ -213,13 +233,25 @@ socket.on('join room success', () => {
   console.log('join room success');
 });
 
+function getPlayerDelitionButton(name) {
+  let button = document.createElement('button');
+  button.onclick = () => socket.emit('delete player', name);
+  button.innerHTML = 'X';
+  button.type = 'button';
+  return button;
+}
+      
 socket.on('new player', (players) => {
   // console.log(players);
   playersList = document.getElementById("players-list")
   playersList.innerHTML = "";
 
   for (var i = 0; i < players.length ; i++) {
-    playersList.innerHTML += `<li> ${players[i]} </li>\n`
+    let button = getPlayerDelitionButton(player[i]);
+    let li = document.createElement('li');
+    li.innerHTML = players[i] + '\n';
+    li.appendChild(button);
+    playersList.appendChild(li);
   }
 })
 
@@ -233,7 +265,14 @@ socket.on('readiness updated', (playersReadiness) => {
     if (playersReadiness[i].isReady) {
       color = "green"
     }
-    playersList.innerHTML += `<li style="color:${color}"> ${playersReadiness[i].name} </li>\n`
+    let name = playersReadiness[i].name;
+    let button = getPlayerDelitionButton(name);
+    let li = document.createElement('li');
+    li.innerHTML = name + '\n';
+    li.style.color = color;
+    li.appendChild(button);
+    playersList.appendChild(li);
+    // playersList.innerHTML += `<li style="color:${color}"> ${playersReadiness[i].name} </li>\n`
   }
 })
 
@@ -250,7 +289,8 @@ document.getElementById('readyButton').onclick = function() {
 }
 
 document.getElementById('startButton').onclick = function() {
-  socket.emit('try start game', roomId)
+  const botCount = 1; // TODO pull from UI
+  socket.emit('try start game', roomId, botCount)
 }
 
 document.getElementById('preview').onclick = function(e) {
@@ -269,6 +309,10 @@ socket.on('start error not ready', () => {
 socket.on('vote error voted self', () => {
   // votedThisRound = false;
   alert("Don't vote your card!");
+});
+      
+socket.on('remove player error', () => {
+  alert("Removing playerd failed, they are probably still here");
 });
 
 
@@ -466,7 +510,12 @@ function displayPlayersWithScores(playersWithScores) {
     let playerName = playersWithScores[i].name;
     let playerScore = playersWithScores[i].score;
     let playerDiv = document.createElement('div');
+    
+    
     playerDiv.innerHTML = `${playerName}: ${playerScore}`;
+    
+    let button = getPlayerDelitionButton(playerName);
+    playerDiv.appendChild(button);
 
     playersListDiv.appendChild(playerDiv);
   }

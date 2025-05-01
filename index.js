@@ -166,6 +166,7 @@ app.get('/rooms/:roomId', async (req, res) => {
 // Handle Socket.io connections
 io.on('connection', (socket) => {
   console.log(`Socket ${socket.id} connected`);
+  let globalRoomID;
 
   socket.on('join room', async (roomId, playerName) => {
     await retryUntilSaved(async (roomId, playerName) => {
@@ -185,11 +186,16 @@ io.on('connection', (socket) => {
         if (existingPlayer) {
           existingPlayer.id = socket.id;
         } else {
+          if (room.gameInProgress) {
+            socket.emit('join room error', 'Game in progress');
+            return;
+          }
           room = await addPlayer(room, { name: playerName, id: socket.id })
         }
         await room.save();
 
         socket.join(roomId);
+        globalRoomID = roomId;
 
         socket.emit('join room success');
 
@@ -223,6 +229,11 @@ io.on('connection', (socket) => {
     await retryUntilSaved(async (roomId) => {
       let room = await Room.findById(roomId);
 
+      if (room.gameInProgress) {
+        socket.emit('start error in progress');
+        return;
+      }
+      
       if (room.players.length < 2) {
         socket.emit('start error few players');
         return;
@@ -333,10 +344,40 @@ io.on('connection', (socket) => {
       }
     }, roomId, cardSrc);
   });
+  
+  socket.on('delete player', async (name) => {
+    await retryUntilSaved(async () => {
+      let room = await Room.findById(globalRoomID);
+      if (room) {
+        let player = getPlayerByName(room, name);
+        if (player) {
+          if (player.id == "-1") {
+            removePlayer(room, player);
+          } else {
+            socket.emit("remove player error");
+          }
+        }
+        await room.save();
+      }
+    });
+    //
+    console.log(`Socket ${socket.id} disconnected`);
+  });
 
   // TODO: Handle disconnections
-  socket.on('disconnect', () => {
-    // TODO: delete player from mongodb
+  socket.on('disconnect', async () => {
+    // TODO: remove player from the DB
+    await retryUntilSaved(async () => {
+      let room = await Room.findById(globalRoomID);
+      if (room) {
+        let player = getPlayerById(room, socket.id);
+        if (player) {
+          player.id = "-1";
+        }
+        await room.save();
+      }
+    });
+    //
     console.log(`Socket ${socket.id} disconnected`);
   });
 });
@@ -402,7 +443,7 @@ function getCardsNames() {
   for (let i = 156; i <= 211; i++) {
     fileNames.push("https://cdn.glitch.global/c2723664-fc3b-43a0-9809-d919707a7e64/" + i + ".jpg")
   }
-  for (let i = 212; i <= 376; i++) {
+  for (let i = 212; i <= 403; i++) {
     fileNames.push("https://cdn.glitch.global/c2723664-fc3b-43a0-9809-d919707a7e64/" + i + ".jpeg")
   }
   return fileNames;
@@ -564,7 +605,7 @@ function resetForNewRound(room) {
   for (let i = 0; i < room.players.length; i++) {
     room.players[i].cards.push(room.drawPile.pop());
   }
-
+  
   room.currentPlayer = (room.currentPlayer + 1) % room.players.length;
   room.currentName = "";
   room.votingStage = false;
@@ -682,6 +723,21 @@ function getPlayerHand(room, socket_id) {
     hand.push({ name: card, isChosen: false });
   }
   return hand;
+}
+
+function removePlayer(room, player) {  
+  for (let i = 0; i < room.players.length; i++) {
+    if (player == room.players[i]) {
+      for (const card of player.cards) {
+        room.discardPile.push(card);
+      }
+      room.players.splice(i, 1);
+      if (room.currentPlayer > i) {
+        room.currentPlayer--;
+      }
+      break;
+    }
+  }
 }
 
 function sleep(ms) {
