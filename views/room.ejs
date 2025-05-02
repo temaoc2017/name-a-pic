@@ -70,6 +70,13 @@
         margin-top: 50px;
       }
 
+      #bot-count-select {
+        background-color: rgba(255, 100, 100, 0.3);
+        border-radius: 5px;
+        height: 1.2em;
+        margin-top: 8px;
+      }
+
       body {
   			margin: 0;
   			padding: 0;
@@ -188,6 +195,13 @@
             <button type="button" name="startButton" id="startButton" class="btn btn-success btn-block">Start</button>
           </div>
         </div>
+
+        <div class="row justify-content-center mt-3">
+          <div class="col-md-6">
+            <label for="bot-count-select">Bot count:</label>
+            <input id="bot-count-select" type="number" min="0" max="3" value="0"/>
+          </div>
+        </div>
       </div>
 
       <div id="game-container">
@@ -291,7 +305,7 @@ document.getElementById('readyButton').onclick = function() {
 }
 
 document.getElementById('startButton').onclick = function() {
-  const botCount = 2; // TODO pull from UI
+  const botCount = Number.parseInt(document.getElementById('bot-count-select').value);
   socket.emit('try start game', roomId, botCount)
 }
 

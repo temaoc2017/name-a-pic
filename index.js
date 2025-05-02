@@ -292,6 +292,7 @@ io.on('connection', (socket) => {
           updateChoosingNameStatistics(room, socket.id, cardName, cardSrc, false);
           io.in(roomId).emit('card name chosen', cardName);
           await retryUntilSaved(async () => {
+            let room = await Room.findById(roomId);
             await AIActionsAtChoosingStart(room);
             await room.save();
           })
@@ -304,11 +305,10 @@ io.on('connection', (socket) => {
         io.in(roomId).emit('card chosen', getPlayersWithChosenCards(room));
         console.log('card chosen by player');
       }
-      if (getPlayersWithChosenCards(room).length == room.players.length) {
-        console.log("everybody chose a card including bots");
-        await retryUntilSaved(async () => {
-          
-          let room = await Room.findById(roomId);
+      await retryUntilSaved(async () => {
+        let room = await Room.findById(roomId);
+        if (getPlayersWithChosenCards(room).length == room.players.length) {
+          console.log("everybody chose a card including bots");
           if (getPlayersWithChosenCards(room).length != room.players.length) {
             console.log("something went wrong, only", getPlayersWithChosenCards(room), "chose a card");
             return;
@@ -321,7 +321,7 @@ io.on('connection', (socket) => {
             io.in(roomId).emit('all cards chosen', shuffleArray(getChosenCards(room)));
             await sleep(1000);
             console.log("pedaling from choosing to voting");
-            
+            // TODO fix failing here resending 'all cards chosen' event
             await AIActionsAtVotingStart(room);
             if (countPlayersWithVotedCards(room) == room.players.length - 1) {
               console.log("pedaling from choosing to voting to new round");
@@ -333,8 +333,8 @@ io.on('connection', (socket) => {
               // throw error;
             // }
           // }
-        });
-      }
+        }
+      });
     }, roomId, cardSrc, cardName)
   });
 
