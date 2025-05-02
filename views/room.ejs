@@ -225,6 +225,8 @@ let roomName = '<%= roomName %>';
 let playerName = '<%= playerName %>';
 let socket = io();
 
+console.log(roomId);
+
 let isReady = false;
 let isNamingCard = false;
 
@@ -289,7 +291,7 @@ document.getElementById('readyButton').onclick = function() {
 }
 
 document.getElementById('startButton').onclick = function() {
-  const botCount = 1; // TODO pull from UI
+  const botCount = 2; // TODO pull from UI
   socket.emit('try start game', roomId, botCount)
 }
 

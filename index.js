@@ -7,6 +7,9 @@ const session = require('express-session');
 const fs = require('fs');
 require('dotenv').config();
 
+const { AI } = require('./AI.js');
+const e = require('express');
+
 const CARDS_IN_HAND = 7;
 
 const app = express();
@@ -250,11 +253,26 @@ io.on('connection', (socket) => {
 
       room = resetForNewGame(room);
 
-      await room.save();
-
       for (let player of room.players) {
-        io.to(player.id).emit('game started', room.players[room.currentPlayer].name, player.cards, getPlayersWithScores(room));
+        if (!player.ai) {
+          io.to(player.id).emit('game started', room.players[room.currentPlayer].name, player.cards, getPlayersWithScores(room));
+        }
       }
+
+      await sleep(1000);
+
+      // await AIActionsAtRoundStart(room);
+      if (room.players[room.currentPlayer].ai) {
+        await AINameCard(room);
+        await room.save();
+        await retryUntilSaved(async (_id) => {
+          let room = await Room.findById(_id);
+          await AIActionsAtChoosingStart(room);
+          await room.save();
+        }, room._id);
+      }
+
+      await room.save();
     }, roomId);
   });
 
@@ -270,36 +288,52 @@ io.on('connection', (socket) => {
         if (getPlayerCard(room, socket.id) == "") {
           room.currentName = cardName;
           room = updatePlayerCard(room, socket.id, cardSrc);
-          await room.save();
-          updateChoosingNameStatistics(room, socket.id, cardName, cardSrc);
+          await room.save(); 
+          updateChoosingNameStatistics(room, socket.id, cardName, cardSrc, false);
           io.in(roomId).emit('card name chosen', cardName);
+          await retryUntilSaved(async () => {
+            await AIActionsAtChoosingStart(room);
+            await room.save();
+          })
         }
       } else if (room.currentName != "" && !room.votingStage) {
+        console.log('player choosing card');
         room = updatePlayerCard(room, socket.id, cardSrc);
         await room.save();
-        updateChoosingCardStatistics(room, socket.id, room.currentName, cardSrc)
-
-        if (getPlayersWithChosenCards(room).length == room.players.length) {
-          (async () => {
-            let room = await Room.findById(roomId);
-            if (getPlayersWithChosenCards(room).length != room.players.length) {
-              return;
+        updateChoosingCardStatistics(room, socket.id, room.currentName, cardSrc, false)
+        io.in(roomId).emit('card chosen', getPlayersWithChosenCards(room));
+        console.log('card chosen by player');
+      }
+      if (getPlayersWithChosenCards(room).length == room.players.length) {
+        console.log("everybody chose a card including bots");
+        await retryUntilSaved(async () => {
+          
+          let room = await Room.findById(roomId);
+          if (getPlayersWithChosenCards(room).length != room.players.length) {
+            console.log("something went wrong, only", getPlayersWithChosenCards(room), "chose a card");
+            return;
+          }
+          room.votingStage = true;
+          await sleep(3000);
+          // TODO remember why try catch it was here
+          // try {
+            await room.save();
+            io.in(roomId).emit('all cards chosen', shuffleArray(getChosenCards(room)));
+            await sleep(1000);
+            console.log("pedaling from choosing to voting");
+            
+            await AIActionsAtVotingStart(room);
+            if (countPlayersWithVotedCards(room) == room.players.length - 1) {
+              console.log("pedaling from choosing to voting to new round");
+              await handleVotingEnd(room);
             }
-            room.votingStage = true;
-            await sleep(3000);
-            try {
-              await room.save();
-              io.in(roomId).emit('all cards chosen', shuffleArray(getChosenCards(room)));
-            } catch (error) {
-              if (!(error instanceof mongoose.Error.VersionError)) {
-                throw error;
-              }
-            }
-          })();
-        } else {
-          io.in(roomId).emit('card chosen', getPlayersWithChosenCards(room));
-          console.log('card chosen');
-        }
+            await room.save();
+          // } catch (error) {
+            // if (!(error instanceof mongoose.Error.VersionError)) {
+              // throw error;
+            // }
+          // }
+        });
       }
     }, roomId, cardSrc, cardName)
   });
@@ -326,25 +360,9 @@ io.on('connection', (socket) => {
         room = setPlayerVote(room, socket.id, cardSrc);
 
         if (countPlayersWithVotedCards(room) == room.players.length - 1) {
-          let roundSummary = getRoundSummary(room);
-          let cardsStatistics = [];
-          for (const [key, value] of roundSummary) {
-            cardsStatistics.push({
-              name: key, 
-              isCorrect: value.correctCard, 
-              playersVoted: value.playersVoted.length
-            });
-          }
-          VotingCardStatictics.create({name: room.currentName, cards: cardsStatistics});
-          room = resetForNewRound(room);
-          await room.save();
-
-          for (let player of room.players) {
-            io.to(player.id).emit('new round', room.players[room.currentPlayer].name, player.cards, getPlayersWithScores(room), Array.from(roundSummary));
-          }
-        } else {
-          await room.save();
+          await handleVotingEnd(room);
         }
+        await room.save();
       }
     }, roomId, cardSrc);
   });
@@ -695,8 +713,8 @@ function getRoundSummary(room) {
   return summary;
 }
 
-function updateChoosingNameStatistics(room, socket_id, cardName, cardSrc) {
-  let statistics = {name: cardName, cards: [] }
+function updateChoosingNameStatistics(room, socket_id, cardName, cardSrc, ai) {
+  let statistics = {name: cardName, cards: [], ai }
   for (const card of getPlayerHand(room, socket_id)) {
     if (card.name == cardSrc) card.isChosen = true;
     statistics.cards.push(card);
@@ -704,8 +722,8 @@ function updateChoosingNameStatistics(room, socket_id, cardName, cardSrc) {
   ChoosingNameStatistics.create(statistics);
 }
 
-function updateChoosingCardStatistics(room, socket_id, cardName, cardSrc) {
-  let statistics = {name: cardName, cards: [] }
+function updateChoosingCardStatistics(room, socket_id, cardName, cardSrc, ai) {
+  let statistics = {name: cardName, cards: [], ai }
   for (const card of getPlayerHand(room, socket_id)) {
     if (card.name == cardSrc) card.isChosen = true;
     statistics.cards.push(card);
@@ -741,6 +759,96 @@ function removePlayer(room, player) {
       }
       break;
     }
+  }
+}
+
+async function AINameCard(room) {
+  let aiPlayer = room.players[room.currentPlayer];
+  let cardSrc = aiPlayer.cards[Math.floor(Math.random() * aiPlayer.cards.length)];
+  let cardName = await AI.nameCard(cardSrc);
+  room.currentName = cardName;
+  room = updatePlayerCard(room, aiPlayer.id, cardSrc);
+  // await room.save();
+  updateChoosingNameStatistics(room, aiPlayer.id, cardName, cardSrc, true);
+  console.log(room._id, cardName);
+  io.in(room._id.toString()).emit('card name chosen', cardName);
+}
+
+async function AIChooseCard(room, aiPlayer) {
+  let cardSrcs = aiPlayer.cards;
+  let cardName = room.currentName;
+  let cardNumber = await AI.chooseCard(cardSrcs, cardName);
+  room = updatePlayerCard(room, aiPlayer.id, cardSrcs[cardNumber]);
+  console.log("chosen card", aiPlayer.chosenCard);
+  // await room.save();
+  console.log(aiPlayer.name, "chose", cardSrcs[cardNumber]);
+  updateChoosingCardStatistics(room, aiPlayer.id, room.currentName, cardSrcs[cardNumber], true)
+}
+
+async function AIVoteCard(room, aiPlayer) {
+  let cardSrcs = shuffleArray(getChosenCards(room));
+  cardSrcs.splice(cardSrcs.findIndex(elem => elem == aiPlayer.chosenCard), 1);
+  let cardName = room.currentName;
+  let cardNumber = await AI.chooseCard(cardSrcs, cardName);
+  room = setPlayerVote(room, aiPlayer.id, cardSrcs[cardNumber]);
+  // await room.save();
+  console.log(aiPlayer.name, "voted", cardSrcs[cardNumber]);
+}
+
+// async function AIActionsAtRoundStart(room) {
+//   if (room.players[room.currentPlayer].ai) {
+//     await AINameCard(room);
+//     await AIActionsAtChoosingStart(room);
+//   }
+// }
+
+async function AIActionsAtChoosingStart(room) {
+  for (let player of room.players) {
+    if (player.ai && player.id != room.players[room.currentPlayer].id) {
+      await AIChooseCard(room, player);
+    }
+  }
+}
+
+async function AIActionsAtVotingStart(room) {
+  for (let player of room.players) {
+    if (player.ai && player.id != room.players[room.currentPlayer].id) {
+      await AIVoteCard(room, player);
+    }
+  }
+}
+
+async function handleVotingEnd(room) {
+  let roundSummary = getRoundSummary(room);
+  let cardsStatistics = [];
+  for (const [key, value] of roundSummary) {
+    cardsStatistics.push({
+      name: key, 
+      isCorrect: value.correctCard, 
+      playersVoted: value.playersVoted.length
+    });
+  }
+  VotingCardStatictics.create({name: room.currentName, cards: cardsStatistics});
+  room = resetForNewRound(room);
+  await room.save();
+
+  for (let player of room.players) {
+    if (!player.ai) {
+      io.to(player.id).emit('new round', room.players[room.currentPlayer].name, player.cards, getPlayersWithScores(room), Array.from(roundSummary));
+    }
+  }
+
+  // await sleep(1000);
+
+  // await AIActionsAtRoundStart(room);
+  if (room.players[room.currentPlayer].ai) {
+    await AINameCard(room);
+    await room.save();
+    await retryUntilSaved(async (_id) => {
+      let room = await Room.findById(_id);
+      await AIActionsAtChoosingStart(room);
+      await room.save();
+    }, room._id);
   }
 }
 
