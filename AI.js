@@ -39,19 +39,53 @@ function sleep(ms) {
 }
 
 export class AI {
-  static chat = ai.chats.create({
-    model: 'gemini-2.0-flash',
-    config: {
-      temperature: 0.5,
-      candidateCount: 1,
-      maxOutputTokens: 32,
-    }
-  });
+  static fileCache = new Map();
 
-  static async makeRequest(...params) {
-    while (true) {
+  // static chat = ai.chats.create({
+  //   model: 'gemini-2.0-flash',
+  //   config: {
+  //     temperature: 0.6,
+  //     candidateCount: 1,
+  //     maxOutputTokens: 32,
+  //   }
+  // });
+
+  // static async makeRequest(...params) {
+  //   for (let tries = 0; tries < 10; tries++) {
+  //     try {
+  //       return await this.chat.sendMessage(...params);
+  //     } catch (error) {
+  //       await sleep(2000);
+  //       if (!(error.name == "ServerError")) { // TODO this probably does not work
+  //         throw error;
+  //       } else {
+  //         console.log(error);
+  //       }
+  //     }
+  //   }
+  //   chat = ai.chats.create({
+  //     model: 'gemini-2.0-flash',
+  //     config: {
+  //       temperature: 0.5,
+  //       candidateCount: 1,
+  //       maxOutputTokens: 32,
+  //     }
+  //   });
+  //   return await this.makeRequest(...params);
+  // }
+
+  static async makeRequest(params) {
+    let generateContentParams = params;
+    generateContentParams.model = 'gemini-2.0-flash';
+    if (!generateContentParams.config) {
+      generateContentParams.config = {};
+    }
+    generateContentParams.config.temperature = 0.6;
+    generateContentParams.config.maxOutputTokens = 32;
+    generateContentParams.contents = generateContentParams.message;
+    for (let tries = 0; tries < 10; tries++) {
       try {
-        return await this.chat.sendMessage(...params);
+        return await ai.models.generateContent(params);
       } catch (error) {
         await sleep(2000);
         if (!(error.name == "ServerError")) { // TODO this probably does not work
@@ -64,6 +98,10 @@ export class AI {
   }
 
   static async getFile(fileName) {
+    if (this.fileCache.get(fileName)) {
+      return this.fileCache[fileName];
+    }
+
     let linkPattern = /^https:\/\/cdn/;
     let file;
     if (fileName.match(linkPattern) == null) {
@@ -73,6 +111,8 @@ export class AI {
       const data = await httpsRequest(fileName);
       file = { buffer: data, name: fileName };
     }
+    this.fileCache[fileName] = file;
+
     return file;
   }
 
@@ -117,7 +157,7 @@ export class AI {
       })
     }
 
-    message.push({ text: `Which of these ${cardSrcs.length} images best suits the name <name>${name}</name>? Answer in a few words with an image number. I understand that choosing one image may be tough, but you must choose one.` })
+    message.push({ text: `Which of these ${cardSrcs.length} images best suits the name <name>${name}</name>? Answer in just a couple words with an image number. I understand that choosing one image may be tough, but you must choose one. Providing the image number is a must.` })
 
     const chatResponse = await this.makeRequest({ message });
     // TODO don't forget to subtract one
