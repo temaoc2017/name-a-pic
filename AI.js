@@ -105,8 +105,8 @@ export class AI {
     let linkPattern = /^https:\/\/cdn/;
     let file;
     if (fileName.match(linkPattern) == null) {
-      fileName = path.join("public/cards", fileName);
-      file = { buffer: fs.readFileSync(fileName), name: fileName };
+      const filePath = path.join("public/cards", fileName);
+      file = { buffer: fs.readFileSync(filePath), name: fileName };
     } else {
       const data = await httpsRequest(fileName);
       file = { buffer: data, name: fileName };

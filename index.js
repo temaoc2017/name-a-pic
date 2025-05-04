@@ -315,24 +315,23 @@ io.on('connection', (socket) => {
           }
           room.votingStage = true;
           await sleep(3000);
-          // TODO remember why try catch it was here
-          // try {
-            await room.save();
-            io.in(roomId).emit('all cards chosen', shuffleArray(getChosenCards(room)));
-            await sleep(1000);
-            console.log("pedaling from choosing to voting");
-            // TODO fix failing here resending 'all cards chosen' event
+          await room.save();
+          io.in(roomId).emit('all cards chosen', shuffleArray(getChosenCards(room)));
+          await sleep(1000);
+          console.log("pedaling from choosing to voting");
+          // TODO fix failing here resending 'all cards chosen' event
+          await retryUntilSaved(async () => {
+            let room = await Room.findById(roomId);
             await AIActionsAtVotingStart(room);
-            if (countPlayersWithVotedCards(room) == room.players.length - 1) {
-              console.log("pedaling from choosing to voting to new round");
-              await handleVotingEnd(room);
-            }
             await room.save();
-          // } catch (error) {
-            // if (!(error instanceof mongoose.Error.VersionError)) {
-              // throw error;
-            // }
-          // }
+            await retryUntilSaved(async () => {
+              let room = await Room.findById(roomId);
+              if (countPlayersWithVotedCards(room) == room.players.length - 1) {
+                console.log("pedaling from choosing to voting to new round");
+                await handleVotingEnd(room);
+              } // room save is in handleVotingEnd
+            })
+          })
         }
       });
     }, roomId, cardSrc, cardName)
@@ -358,11 +357,14 @@ io.on('connection', (socket) => {
 
       if (getPlayersWithChosenCards(room).length == room.players.length) {
         room = setPlayerVote(room, socket.id, cardSrc);
-
-        if (countPlayersWithVotedCards(room) == room.players.length - 1) {
-          await handleVotingEnd(room);
-        }
         await room.save();
+
+        await retryUntilSaved(async () => {
+          let room = await Room.findById(roomId);
+          if (countPlayersWithVotedCards(room) == room.players.length - 1) {
+            await handleVotingEnd(room);
+          }
+        })
       }
     }, roomId, cardSrc);
   });
@@ -803,6 +805,8 @@ async function AIVoteCard(room, aiPlayer) {
 // }
 
 async function AIActionsAtChoosingStart(room) {
+  console.log("AIActionsAtChoosingStart");
+  
   for (let player of room.players) {
     if (player.ai && player.id != room.players[room.currentPlayer].id) {
       await AIChooseCard(room, player);
